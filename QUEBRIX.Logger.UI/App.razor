@@ -1,0 +1,19 @@
+﻿<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not Found</PageTitle>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <div class="empty-state" style="height: 60vh;">
+                <div class="empty-icon">
+                    <i class="fas fa-map-signs"></i>
+                </div>
+                <h3>Page not found</h3>
+                <p>The page you're looking for doesn't exist.</p>
+                <a href="/" class="btn btn-primary">Go to Logs Explorer</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

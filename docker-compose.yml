@@ -1,0 +1,102 @@
+# =============================================================================
+# QUEBRIX Logger Platform - Docker Compose
+# =============================================================================
+# Deploys the complete QUEBRIX logging platform:
+#   - Elasticsearch 8.x for log storage
+#   - Kibana for log visualization and management
+#   - QUEBRIX Logger Server for log ingestion
+# =============================================================================
+
+version: "3.9"
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: quebrix-elasticsearch
+    restart: unless-stopped
+    environment:
+      - cluster.name=quebrix-cluster
+      - node.name=quebrix-node
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - network.host=0.0.0.0
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - quebrix-es-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=green&timeout=5s" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - quebrix-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    container_name: quebrix-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+      - SERVER_NAME=quebrix-kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - quebrix-network
+
+  quebrix-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quebrix-server
+    restart: unless-stopped
+    environment:
+      - QUEBRIX_APPLICATION=QUEBRIX Logger
+      - QUEBRIX_ENVIRONMENT=Production
+      - QUEBRIX_LISTENURL=http://0.0.0.0:8080
+      - QUEBRIX_ELASTICSEARCH__URLS__0=http://elasticsearch:9200
+      - QUEBRIX_ELASTICSEARCH__DEFAULTINDEXPREFIX=quebrix-logs
+      - QUEBRIX_ELASTICSEARCH__NUMBEROFSHARDS=1
+      - QUEBRIX_ELASTICSEARCH__NUMBEROFREPLICAS=0
+      - QUEBRIX_ELASTICSEARCH__ENABLEILM=true
+      - QUEBRIX_ELASTICSEARCH__BULKBATCHSIZE=1000
+      - QUEBRIX_ELASTICSEARCH__BULKCONCURRENCY=4
+      - QUEBRIX_ELASTICSEARCH__MAXRETRIES=3
+      - QUEBRIX_ELASTICSEARCH__RETRYDELAYMILLISECONDS=1000
+      - ASPNETCORE_ENVIRONMENT=Production
+    ports:
+      - "8080:8080"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - quebrix-network
+
+volumes:
+  quebrix-es-data:
+    driver: local
+
+networks:
+  quebrix-network:
+    driver: bridge

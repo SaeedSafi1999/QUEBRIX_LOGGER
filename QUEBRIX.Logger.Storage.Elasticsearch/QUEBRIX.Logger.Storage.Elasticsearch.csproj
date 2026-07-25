@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>QUEBRIX.Logger.Storage.Elasticsearch</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.15.*" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QUEBRIX.Logger.Common\QUEBRIX.Logger.Common.csproj" />
+    <ProjectReference Include="..\QUEBRIX.Logger.Contracts\QUEBRIX.Logger.Contracts.csproj" />
+    <ProjectReference Include="..\QUEBRIX.Logger.Storage.Abstractions\QUEBRIX.Logger.Storage.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+@QUEBRIX.Logger.Server_HostAddress = http://localhost:5090
+
+GET {{QUEBRIX.Logger.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

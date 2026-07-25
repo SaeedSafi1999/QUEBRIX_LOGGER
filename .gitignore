@@ -1,0 +1,34 @@
+# .NET Core
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.vs/
+*.nupkg
+*.snupkg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test Results
+TestResults/
+coverage/
+*.trx
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Build
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/

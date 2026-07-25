@@ -1,0 +1,881 @@
+@page "/"
+@page "/logs"
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using QUEBRIX.Logger.UI.Models
+@using QUEBRIX.Logger.UI.Services
+@implements IDisposable
+@inject LogApiService Api
+@inject ILogger<LogsExplorer> Logger
+
+<div class="logs-explorer">
+    <!-- Top Toolbar -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input
+                    type="text"
+                    class="search-input"
+                    placeholder="Search logs by message, exception, trace ID, source..."
+                    @bind="searchTerm"
+                    @bind:after="OnSearchChanged"
+                />
+                <button class="btn btn-icon" @onclick="ClearSearch" title="Clear search">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <button class="btn btn-primary" @onclick="SearchAsync" title="Search">
+                <i class="fas fa-search"></i> Search
+            </button>
+            <button class="btn btn-secondary" @onclick="RefreshAsync" title="Refresh">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="btn btn-secondary" @onclick="ToggleAutoRefresh" title="Auto refresh">
+                <i class="fas @(autoRefresh ? "fa-pause" : "fa-play")"></i>
+                <span class="auto-refresh-text">@(autoRefresh ? "Pause" : "Auto")</span>
+            </button>
+        </div>
+        <div class="toolbar-right">
+            <span class="result-count">
+                @if (isLoading)
+                {
+                    <span class="spinner"></span>
+                }
+                else
+                {
+                    @: <strong>@totalCount.ToString("N0")</strong> results
+                    @: <span class="text-muted">@GetPageSizeText()</span>
+                }
+            </span>
+            <div class="time-range-selector">
+                <select class="form-select form-select-sm" @bind="selectedTimeRange" @bind:after="OnTimeRangeChanged">
+                    <option value="15m">Last 15 minutes</option>
+                    <option value="1h">Last 1 hour</option>
+                    <option value="6h">Last 6 hours</option>
+                    <option value="24h">Last 24 hours</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="custom">Custom range</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content @(selectedLog != null ? "with-detail" : "")">
+        <!-- Sidebar Filters -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">
+                    <i class="fas fa-filter"></i> Filters
+                    <button class="btn btn-link btn-sm" @onclick="ClearAllFilters">Clear all</button>
+                </h3>
+            </div>
+
+            <!-- Level Filter -->
+            <div class="sidebar-section">
+                <h4 class="sidebar-subtitle">
+                    <i class="fas fa-tag"></i> Level
+                </h4>
+                <div class="filter-options">
+                    @foreach (var level in levelOptions)
+                    {
+                        var isSelected = selectedLevels.Contains(level);
+                        var count = levelCounts.GetValueOrDefault(level, 0L);
+                        <label class="filter-checkbox @(isSelected ? "active" : "")" @onclick="() => ToggleLevel(level)">
+                            <span class="level-badge level-@level.ToLowerInvariant()">@level</span>
+                            <span class="filter-count">@count.ToString("N0")</span>
+                            @if (isSelected)
+                            {
+                                <i class="fas fa-check-circle check-mark"></i>
+                            }
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <!-- Source Context Filter -->
+            <div class="sidebar-section">
+                <h4 class="sidebar-subtitle">
+                    <i class="fas fa-code"></i> Source
+                </h4>
+                <div class="filter-search">
+                    <input
+                        type="text"
+                        class="form-input-sm"
+                        placeholder="Filter sources..."
+                        @bind="sourceFilterText"
+                        @bind:after="OnSourceFilterChanged"
+                    />
+                </div>
+                <div class="filter-options filter-options-scroll">
+                    @foreach (var source in filteredSources.Take(15))
+                    {
+                        var isSelected = sourceFilter == source.Key;
+                        <label class="filter-checkbox @(isSelected ? "active" : "")" @onclick="() => SetSourceFilter(source.Key)">
+                            <span class="filter-key">@TruncateText(source.Key, 35)</span>
+                            <span class="filter-count">@source.Count.ToString("N0")</span>
+                            @if (isSelected)
+                            {
+                                <i class="fas fa-check-circle check-mark"></i>
+                            }
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <!-- Application Filter -->
+            <div class="sidebar-section">
+                <h4 class="sidebar-subtitle">
+                    <i class="fas fa-server"></i> Application
+                </h4>
+                <div class="filter-options filter-options-scroll">
+                    @foreach (var app in filteredApplications.Take(10))
+                    {
+                        var isSelected = applicationFilter == app.Key;
+                        <label class="filter-checkbox @(isSelected ? "active" : "")" @onclick="() => SetApplicationFilter(app.Key)">
+                            <span class="filter-key">@app.Key</span>
+                            <span class="filter-count">@app.Count.ToString("N0")</span>
+                            @if (isSelected)
+                            {
+                                <i class="fas fa-check-circle check-mark"></i>
+                            }
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <!-- Environment Filter -->
+            <div class="sidebar-section">
+                <h4 class="sidebar-subtitle">
+                    <i class="fas fa-globe"></i> Environment
+                </h4>
+                <div class="filter-options">
+                    @foreach (var env in filteredEnvironments.Take(10))
+                    {
+                        var isSelected = environmentFilter == env.Key;
+                        <label class="filter-checkbox @(isSelected ? "active" : "")" @onclick="() => SetEnvironmentFilter(env.Key)">
+                            <span class="filter-key">@env.Key</span>
+                            <span class="filter-count">@env.Count.ToString("N0")</span>
+                            @if (isSelected)
+                            {
+                                <i class="fas fa-check-circle check-mark"></i>
+                            }
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <!-- Exception Filter -->
+            <div class="sidebar-section">
+                <h4 class="sidebar-subtitle">
+                    <i class="fas fa-exclamation-triangle"></i> Exceptions
+                </h4>
+                <div class="filter-options">
+                    <label class="filter-checkbox @(hasExceptionFilter == true ? "active" : "")" @onclick="() => SetExceptionFilter(true)">
+                        <span class="filter-key">With exceptions</span>
+                        @if (hasExceptionFilter == true)
+                        {
+                            <i class="fas fa-check-circle check-mark"></i>
+                        }
+                    </label>
+                    <label class="filter-checkbox @(hasExceptionFilter == false ? "active" : "")" @onclick="() => SetExceptionFilter(false)">
+                        <span class="filter-key">Without exceptions</span>
+                        @if (hasExceptionFilter == false)
+                        {
+                            <i class="fas fa-check-circle check-mark"></i>
+                        }
+                    </label>
+                    @if (hasExceptionFilter.HasValue)
+                    {
+                        <button class="btn btn-link btn-sm" @onclick="() => SetExceptionFilter(null)">Clear</button>
+                    }
+                </div>
+            </div>
+
+            <!-- Trace/Correlation ID -->
+            <div class="sidebar-section">
+                <h4 class="sidebar-subtitle">
+                    <i class="fas fa-link"></i> Tracing
+                </h4>
+                <div class="form-group">
+                    <input
+                        type="text"
+                        class="form-input-sm"
+                        placeholder="Trace ID..."
+                        @bind="traceIdFilter"
+                        @bind:after="OnTraceFilterChanged"
+                    />
+                </div>
+                <div class="form-group">
+                    <input
+                        type="text"
+                        class="form-input-sm"
+                        placeholder="Correlation ID..."
+                        @bind="correlationIdFilter"
+                        @bind:after="OnCorrelationFilterChanged"
+                    />
+                </div>
+            </div>
+
+            <!-- Custom Time Range -->
+            @if (selectedTimeRange == "custom")
+            {
+                <div class="sidebar-section">
+                    <h4 class="sidebar-subtitle">
+                        <i class="fas fa-calendar"></i> Custom Range
+                    </h4>
+                    <div class="form-group">
+                        <label class="form-label">From</label>
+                        <input type="datetime-local" class="form-input-sm" @bind="customStartTime" @bind:after="OnCustomTimeChanged" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">To</label>
+                        <input type="datetime-local" class="form-input-sm" @bind="customEndTime" @bind:after="OnCustomTimeChanged" />
+                    </div>
+                </div>
+            }
+        </aside>
+
+        <!-- Log Table -->
+        <section class="log-table-container">
+            @if (isLoading)
+            {
+                <div class="loading-overlay">
+                    <div class="spinner-lg"></div>
+                    <span>Searching logs...</span>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(error))
+            {
+                <div class="error-banner">
+                    <i class="fas fa-exclamation-circle"></i>
+                    @error
+                </div>
+            }
+            else if (logs.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h3>No logs found</h3>
+                    <p>Try adjusting your search query or filters.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-wrapper">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th class="col-level">Level</th>
+                                <th class="col-time">Timestamp</th>
+                                <th class="col-message">Message</th>
+                                <th class="col-source">Source</th>
+                                <th class="col-action"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in logs)
+                            {
+                                var isSelected = selectedLog == log;
+                                <tr class="log-row @(isSelected ? "selected" : "") @(log.Exception != null ? "has-exception" : "")"
+                                    @onclick="() => SelectLog(log)" @onclick:stopPropagation>
+                                    <td class="col-level">
+                                        <span class="level-badge level-@log.Level.ToLowerInvariant()">@log.Level</span>
+                                    </td>
+                                    <td class="col-time" title="@log.Timestamp?.ToString("yyyy-MM-dd HH:mm:ss.fff")">
+                                        <span class="timestamp">@FormatTimestamp(log.Timestamp)</span>
+                                        <span class="timestamp-relative">@GetRelativeTime(log.Timestamp)</span>
+                                    </td>
+                                    <td class="col-message">
+                                        <div class="message-cell">
+                                            @if (log.Exception != null)
+                                            {
+                                                <i class="fas fa-exclamation-circle exception-indicator" title="Has exception"></i>
+                                            }
+                                            <span class="message-text">@TruncateText(log.Message ?? log.MessageTemplate ?? "", 200)</span>
+                                        </div>
+                                    </td>
+                                    <td class="col-source" title="@log.SourceContext">
+                                        <span class="source-text">@TruncateText(log.SourceContext, 40)</span>
+                                    </td>
+                                    <td class="col-action">
+                                        <button class="btn btn-icon btn-sm" @onclick="() => CopyLog(log)" title="Copy JSON">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <div class="pagination-info">
+                        Showing @((currentPage - 1) * currentPageSize + 1)-@Math.Min(currentPage * currentPageSize, (int)totalCount) of @totalCount.ToString("N0")
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="btn btn-sm" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(1)">
+                            <i class="fas fa-angle-double-left"></i>
+                        </button>
+                        <button class="btn btn-sm" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(currentPage - 1)">
+                            <i class="fas fa-angle-left"></i>
+                        </button>
+                        @foreach (var p in GetPageNumbers())
+                        {
+                            <button class="btn btn-sm @(p == currentPage ? "btn-active" : "")" @onclick="() => GoToPage(p)">
+                                @p
+                            </button>
+                        }
+                        <button class="btn btn-sm" disabled="@(currentPage >= totalPages)" @onclick="() => GoToPage(currentPage + 1)">
+                            <i class="fas fa-angle-right"></i>
+                        </button>
+                        <button class="btn btn-sm" disabled="@(currentPage >= totalPages)" @onclick="() => GoToPage(totalPages)">
+                            <i class="fas fa-angle-double-right"></i>
+                        </button>
+                    </div>
+                    <div class="pagination-size">
+                        <select class="form-select-sm" @bind="currentPageSize" @bind:after="OnPageSizeChanged">
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                        </select>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <!-- Log Detail Panel -->
+        @if (selectedLog != null)
+        {
+            <section class="detail-panel">
+                <div class="detail-header">
+                    <h3>Log Detail</h3>
+                    <button class="btn btn-icon" @onclick="CloseDetail" title="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="detail-body">
+                    <div class="detail-section">
+                        <div class="detail-field">
+                            <label>Level</label>
+                            <span class="level-badge level-@selectedLog.Level.ToLowerInvariant()">@selectedLog.Level</span>
+                        </div>
+                        <div class="detail-field">
+                            <label>Timestamp</label>
+                            <span>@selectedLog.Timestamp?.ToString("yyyy-MM-dd HH:mm:ss.fff")</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>Message</h4>
+                        <div class="detail-message">@selectedLog.Message</div>
+                        @if (!string.IsNullOrEmpty(selectedLog.MessageTemplate) && selectedLog.MessageTemplate != selectedLog.Message)
+                        {
+                            <div class="detail-template">
+                                <label>Template</label>
+                                <code>@selectedLog.MessageTemplate</code>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(selectedLog.Exception))
+                    {
+                        <div class="detail-section detail-exception">
+                            <h4>
+                                <i class="fas fa-exclamation-triangle"></i> Exception
+                            </h4>
+                            <pre class="exception-stack">@selectedLog.Exception</pre>
+                        </div>
+                    }
+
+                    <div class="detail-section">
+                        <h4>Properties</h4>
+                        <div class="detail-properties">
+                            <div class="detail-field">
+                                <label>Source Context</label>
+                                <span>@selectedLog.SourceContext</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Application</label>
+                                <span>@selectedLog.Application</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Environment</label>
+                                <span>@selectedLog.Environment</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Machine</label>
+                                <span>@selectedLog.MachineName</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Host</label>
+                                <span>@selectedLog.Host</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Process ID</label>
+                                <span>@selectedLog.ProcessId</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Thread ID</label>
+                                <span>@selectedLog.ThreadId</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>Tracing</h4>
+                        <div class="detail-properties">
+                            <div class="detail-field">
+                                <label>Trace ID</label>
+                                <span class="mono">@selectedLog.TraceId</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Span ID</label>
+                                <span class="mono">@selectedLog.SpanId</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Correlation ID</label>
+                                <span class="mono">@selectedLog.CorrelationId</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Request ID</label>
+                                <span>@selectedLog.RequestId</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>User ID</label>
+                                <span>@selectedLog.UserId</span>
+                            </div>
+                            <div class="detail-field">
+                                <label>Session ID</label>
+                                <span>@selectedLog.SessionId</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (selectedLog.Properties != null && selectedLog.Properties.Count > 0)
+                    {
+                        <div class="detail-section">
+                            <h4>Additional Properties</h4>
+                            <div class="detail-properties">
+                                @foreach (var prop in selectedLog.Properties)
+                                {
+                                    <div class="detail-field">
+                                        <label>@prop.Key</label>
+                                        <span class="mono">@JsonSerializer.Serialize(prop.Value)</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="detail-raw">
+                        <button class="btn btn-secondary btn-sm" @onclick="() => showRawJson = !showRawJson">
+                            <i class="fas fa-code"></i> @(showRawJson ? "Hide" : "Show") Raw JSON
+                        </button>
+                        @if (showRawJson)
+                        {
+                            <pre class="raw-json"><code>@JsonSerializer.Serialize(selectedLog, new JsonSerializerOptions { WriteIndented = true })</code></pre>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    private List<LogEvent> logs = new();
+    private long totalCount;
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private int currentPageSize = 50;
+    private bool isLoading;
+    private string? error;
+    private LogEvent? selectedLog;
+    private bool showRawJson;
+    private bool autoRefresh;
+    private CancellationTokenSource? autoRefreshCts;
+
+    // Search
+    private string searchTerm = string.Empty;
+    private string debouncedSearchTerm = string.Empty;
+
+    // Time range
+    private string selectedTimeRange = "1h";
+    private DateTime? customStartTime;
+    private DateTime? customEndTime;
+
+    // Level filter
+    private HashSet<string> selectedLevels = new();
+    private static readonly string[] levelOptions = { "Fatal", "Error", "Warning", "Information", "Debug", "Verbose" };
+    private Dictionary<string, long> levelCounts = new();
+
+    // Source filter
+    private string? sourceFilter;
+    private string sourceFilterText = string.Empty;
+    private List<AggregationItem> allSources = new();
+    private List<AggregationItem> filteredSources => string.IsNullOrWhiteSpace(sourceFilterText)
+        ? allSources
+        : allSources.Where(s => s.Key.Contains(sourceFilterText, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    // Application filter
+    private string? applicationFilter;
+    private List<AggregationItem> allApplications = new();
+    private List<AggregationItem> filteredApplications => allApplications;
+
+    // Environment filter
+    private string? environmentFilter;
+    private List<AggregationItem> allEnvironments = new();
+    private List<AggregationItem> filteredEnvironments => allEnvironments;
+
+    // Exception filter
+    private bool? hasExceptionFilter;
+
+    // Trace/Correlation
+    private string? traceIdFilter;
+    private string? correlationIdFilter;
+
+    // Debounce timer
+    private CancellationTokenSource? debounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            var request = BuildRequest();
+            var response = await Api.SearchAsync(request);
+
+            if (!string.IsNullOrEmpty(response.Error))
+            {
+                error = response.Error;
+            }
+            else
+            {
+                logs = response.Events;
+                totalCount = response.TotalCount;
+                currentPage = response.Page;
+                totalPages = (int)Math.Ceiling((double)totalCount / currentPageSize);
+                if (totalPages < 1) totalPages = 1;
+
+                // Update aggregations
+                if (response.Aggregations != null)
+                {
+                    levelCounts = response.Aggregations.Levels.ToDictionary(l => l.Key, l => l.Count);
+                    allSources = response.Aggregations.SourceContexts;
+                    allApplications = response.Aggregations.Applications;
+                    allEnvironments = response.Aggregations.Environments;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to search logs: {ex.Message}";
+            Logger.LogError(ex, "Search failed");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private LogSearchRequest BuildRequest()
+    {
+        // Calculate time range
+        DateTime? startTime = null;
+        DateTime? endTime = null;
+
+        if (selectedTimeRange == "custom")
+        {
+            startTime = customStartTime;
+            endTime = customEndTime;
+        }
+        else
+        {
+            endTime = DateTime.UtcNow;
+            startTime = selectedTimeRange switch
+            {
+                "15m" => DateTime.UtcNow.AddMinutes(-15),
+                "1h" => DateTime.UtcNow.AddHours(-1),
+                "6h" => DateTime.UtcNow.AddHours(-6),
+                "24h" => DateTime.UtcNow.AddHours(-24),
+                "7d" => DateTime.UtcNow.AddDays(-7),
+                "30d" => DateTime.UtcNow.AddDays(-30),
+                _ => DateTime.UtcNow.AddHours(-1)
+            };
+        }
+
+        return new LogSearchRequest
+        {
+            SearchTerm = string.IsNullOrWhiteSpace(debouncedSearchTerm) ? null : debouncedSearchTerm,
+            Levels = selectedLevels.Count > 0 ? selectedLevels.ToList() : null,
+            SourceContext = sourceFilter,
+            Application = applicationFilter,
+            Environment = environmentFilter,
+            StartTime = startTime,
+            EndTime = endTime,
+            HasException = hasExceptionFilter,
+            TraceId = string.IsNullOrWhiteSpace(traceIdFilter) ? null : traceIdFilter,
+            CorrelationId = string.IsNullOrWhiteSpace(correlationIdFilter) ? null : correlationIdFilter,
+            Page = currentPage,
+            PageSize = currentPageSize
+        };
+    }
+
+    private async Task RefreshAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task OnSearchChanged()
+    {
+        // Debounce search
+        debounceCts?.Cancel();
+        debounceCts = new CancellationTokenSource();
+        var token = debounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (!token.IsCancellationRequested)
+            {
+                debouncedSearchTerm = searchTerm;
+                currentPage = 1;
+                await SearchAsync();
+            }
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void ClearSearch()
+    {
+        searchTerm = string.Empty;
+        debouncedSearchTerm = string.Empty;
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private async Task OnTimeRangeChanged()
+    {
+        await SearchAsync();
+    }
+
+    private async Task OnSourceFilterChanged()
+    {
+        // Just re-render to update filtered sources list
+    }
+
+    private async Task OnTraceFilterChanged()
+    {
+        currentPage = 1;
+        await SearchAsync();
+    }
+
+    private async Task OnCorrelationFilterChanged()
+    {
+        currentPage = 1;
+        await SearchAsync();
+    }
+
+    private async Task OnCustomTimeChanged()
+    {
+        if (selectedTimeRange == "custom")
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task OnPageSizeChanged()
+    {
+        currentPage = 1;
+        await SearchAsync();
+    }
+
+    private void ToggleLevel(string level)
+    {
+        if (selectedLevels.Contains(level))
+            selectedLevels.Remove(level);
+        else
+            selectedLevels.Add(level);
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private void SetSourceFilter(string? source)
+    {
+        sourceFilter = sourceFilter == source ? null : source;
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private void SetApplicationFilter(string? app)
+    {
+        applicationFilter = applicationFilter == app ? null : app;
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private void SetEnvironmentFilter(string? env)
+    {
+        environmentFilter = environmentFilter == env ? null : env;
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private void SetExceptionFilter(bool? val)
+    {
+        hasExceptionFilter = hasExceptionFilter == val ? null : val;
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private void ClearAllFilters()
+    {
+        selectedLevels.Clear();
+        sourceFilter = null;
+        sourceFilterText = string.Empty;
+        applicationFilter = null;
+        environmentFilter = null;
+        hasExceptionFilter = null;
+        traceIdFilter = null;
+        correlationIdFilter = null;
+        currentPage = 1;
+        _ = SearchAsync();
+    }
+
+    private void SelectLog(LogEvent log)
+    {
+        if (selectedLog == log)
+        {
+            CloseDetail();
+        }
+        else
+        {
+            selectedLog = log;
+            showRawJson = false;
+        }
+    }
+
+    private void CloseDetail()
+    {
+        selectedLog = null;
+        showRawJson = false;
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > totalPages || page == currentPage) return;
+        currentPage = page;
+        await SearchAsync();
+    }
+
+    private List<int> GetPageNumbers()
+    {
+        var pages = new List<int>();
+        const int maxVisible = 7;
+        var start = Math.Max(1, currentPage - 3);
+        var end = Math.Min(totalPages, start + maxVisible - 1);
+
+        if (end - start < maxVisible - 1)
+        {
+            start = Math.Max(1, end - maxVisible + 1);
+        }
+
+        for (int i = start; i <= end; i++)
+            pages.Add(i);
+
+        return pages;
+    }
+
+    private void ToggleAutoRefresh()
+    {
+        autoRefresh = !autoRefresh;
+        if (autoRefresh)
+        {
+            autoRefreshCts = new CancellationTokenSource();
+            _ = AutoRefreshLoop(autoRefreshCts.Token);
+        }
+        else
+        {
+            autoRefreshCts?.Cancel();
+            autoRefreshCts?.Dispose();
+            autoRefreshCts = null;
+        }
+    }
+
+    private async Task AutoRefreshLoop(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(15000, ct); // 15 seconds
+                if (!ct.IsCancellationRequested)
+                {
+                    await SearchAsync();
+                }
+            }
+            catch (TaskCanceledException) { }
+        }
+    }
+
+    private async Task CopyLog(LogEvent log)
+    {
+        var json = JsonSerializer.Serialize(log, new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await Task.Run(() =>
+            {
+                // Use JS interop in a real app
+            });
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        debounceCts?.Cancel();
+        debounceCts?.Dispose();
+        autoRefreshCts?.Cancel();
+        autoRefreshCts?.Dispose();
+    }
+
+    // --- Formatting helpers ---
+    private static string FormatTimestamp(DateTime? ts)
+    {
+        if (ts == null) return "-";
+        return ts.Value.ToLocalTime().ToString("HH:mm:ss.fff");
+    }
+
+    private static string GetRelativeTime(DateTime? ts)
+    {
+        if (ts == null) return "";
+        var diff = DateTime.UtcNow - ts.Value.ToUniversalTime();
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return ts.Value.ToLocalTime().ToString("MMM dd");
+    }
+
+    private string GetPageSizeText() => $"{currentPageSize} per page";
+
+    private static string TruncateText(string? text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "-";
+        return text.Length <= maxLength ? text : text[..maxLength] + "...";
+    }
+}

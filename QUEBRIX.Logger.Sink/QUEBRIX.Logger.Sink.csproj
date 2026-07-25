@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>QUEBRIX.Logger.Sink</RootNamespace>
+
+    <!-- NuGet Package Settings -->
+    <IsPackable>true</IsPackable>
+    <PackageId>QUEBRIX.Logger.Sink</PackageId>
+    <Title>QUEBRIX Logger - Serilog Sink</Title>
+    <Description>Enterprise-grade Serilog sink for QUEBRIX Logger - a modern, high-performance logging platform. Drop-in replacement for WriteTo.Seq().</Description>
+    <Authors>QUEBRIX</Authors>
+    <PackageProjectUrl>https://github.com/quebrix/logger</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>serilog;sink;logging;quebrix;elasticsearch;seq-replacement</PackageTags>
+    <RepositoryUrl>https://github.com/quebrix/logger</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.0.*" />
+    <PackageReference Include="Serilog.Sinks.PeriodicBatching" Version="5.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QUEBRIX.Logger.Common\QUEBRIX.Logger.Common.csproj" />
+    <ProjectReference Include="..\QUEBRIX.Logger.Contracts\QUEBRIX.Logger.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

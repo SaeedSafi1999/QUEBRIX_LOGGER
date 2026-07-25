@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>QUEBRIX Logger</title>
+    <base href="/" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- Custom Styles -->
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="QUEBRIX.Logger.UI.styles.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app">
+        <div class="loading-overlay" style="height: 100vh;">
+            <div class="spinner spinner-lg"></div>
+            <span>Loading QUEBRIX Logger...</span>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" class="error-banner" style="display:none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; margin: 0; border-radius: 0;">
+        <i class="fas fa-exclamation-triangle"></i>
+        An unhandled error has occurred.
+        <a href="" class="btn btn-link">Reload</a>
+        <a class="btn btn-link" style="cursor:pointer;">Dismiss</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>

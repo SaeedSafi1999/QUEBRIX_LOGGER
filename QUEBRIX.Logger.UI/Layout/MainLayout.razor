@@ -1,0 +1,24 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page-layout">
+    <header class="page-header">
+        <div class="brand">
+            <span class="brand-icon">QL</span>
+            <span>QUEBRIX Logger</span>
+        </div>
+        <nav class="header-nav">
+            <a class="nav-link active" href="/">
+                <i class="fas fa-list"></i> Logs Explorer
+            </a>
+        </nav>
+        <div class="header-right">
+            <span id="connection-status" class="text-muted">
+                <i class="fas fa-circle" style="color: var(--accent-success); font-size: 8px;"></i>
+                Connected
+            </span>
+        </div>
+    </header>
+    <main class="page-body">
+        @Body
+    </main>
+</div>
