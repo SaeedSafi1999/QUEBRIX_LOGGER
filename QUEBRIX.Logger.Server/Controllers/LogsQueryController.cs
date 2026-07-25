@@ -1,9 +1,7 @@
 using System.Text.Json;
-using Elastic.Clients.Elasticsearch;
-using Elastic.Clients.Elasticsearch.Aggregations;
-using Elastic.Clients.Elasticsearch.QueryDsl;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Nest;
 using QUEBRIX.Logger.Contracts;
 
 namespace QUEBRIX.Logger.Server.Controllers;
@@ -17,10 +15,10 @@ namespace QUEBRIX.Logger.Server.Controllers;
 [AllowAnonymous]
 public sealed class LogsQueryController : ControllerBase
 {
-    private readonly ElasticsearchClient _client;
+    private readonly IElasticClient _client;
     private readonly ILogger<LogsQueryController> _logger;
 
-    public LogsQueryController(ElasticsearchClient client, ILogger<LogsQueryController> logger)
+    public LogsQueryController(IElasticClient client, ILogger<LogsQueryController> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -40,8 +38,8 @@ public sealed class LogsQueryController : ControllerBase
         var pageSize = Math.Clamp(request.PageSize, 1, 200);
         var from = (page - 1) * pageSize;
 
-        var mustQueries = new List<Action<QueryDescriptor<LogEvent>>>();
-        var filterQueries = new List<Action<QueryDescriptor<LogEvent>>>();
+        var mustQueries = new List<Func<QueryContainerDescriptor<LogEvent>, QueryContainer>>();
+        var filterQueries = new List<Func<QueryContainerDescriptor<LogEvent>, QueryContainer>>();
 
         // Full-text search across message, exception, and source context
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
@@ -54,13 +52,13 @@ public sealed class LogsQueryController : ControllerBase
                         .Field("@x", 1.5)
                         .Field("SourceContext", 2.0)
                         .Field("@mt", 2.0)
-                        .Field("Application", 1.0)
-                        .Field("Environment", 1.0)
-                        .Field("MachineName", 1.0)
-                        .Field("TraceId", 1.5)
-                        .Field("CorrelationId", 1.5)
-                        .Field("RequestId", 1.0)
-                        .Field("Host", 1.0)
+                        .Field("Application")
+                        .Field("Environment")
+                        .Field("MachineName")
+                        .Field("@tr", 1.5)
+                        .Field("@l", 1.5)
+                        .Field("RequestId")
+                        .Field("Host")
                     )
                     .Query(term)
                     .Type(TextQueryType.BestFields)
@@ -73,7 +71,7 @@ public sealed class LogsQueryController : ControllerBase
             filterQueries.Add(q => q
                 .Terms(t => t
                     .Field("@level")
-                    .Terms(new TermsQueryField(request.Levels.Select(l => FieldValue.String(l)).ToArray()))
+                    .Terms(request.Levels.Select(l => (object)l).ToArray())
                 ));
         }
 
@@ -115,9 +113,9 @@ public sealed class LogsQueryController : ControllerBase
                 {
                     r.Field("@timestamp");
                     if (request.StartTime.HasValue)
-                        r.Gte(request.StartTime.Value);
+                        r.GreaterThanOrEquals(request.StartTime.Value);
                     if (request.EndTime.HasValue)
-                        r.Lte(request.EndTime.Value);
+                        r.LessThanOrEquals(request.EndTime.Value);
                     return r;
                 }));
         }
@@ -135,28 +133,28 @@ public sealed class LogsQueryController : ControllerBase
                     .MustNot(mn => mn.Exists(e => e.Field("@x")))));
         }
 
-        // Trace ID filter
+        // Trace ID filter (@tr field)
         if (!string.IsNullOrWhiteSpace(request.TraceId))
         {
             filterQueries.Add(q => q
                 .MatchPhrase(m => m
-                    .Field("TraceId")
+                    .Field("@tr")
                     .Query(request.TraceId)
                 ));
         }
 
-        // Correlation ID filter
+        // Correlation ID filter (@l field)
         if (!string.IsNullOrWhiteSpace(request.CorrelationId))
         {
             filterQueries.Add(q => q
                 .MatchPhrase(m => m
-                    .Field("CorrelationId")
+                    .Field("@l")
                     .Query(request.CorrelationId)
                 ));
         }
 
         // Build the bool query
-        var boolQuery = new Action<QueryDescriptor<LogEvent>>(q => q
+        Func<QueryContainerDescriptor<LogEvent>, QueryContainer> boolQuery = q => q
             .Bool(b =>
             {
                 if (mustQueries.Count > 0)
@@ -167,24 +165,27 @@ public sealed class LogsQueryController : ControllerBase
 
                 // If no queries, match all
                 if (mustQueries.Count == 0 && filterQueries.Count == 0)
-                    b.Must(m => m.MatchAll(mm => { }));
-            }));
+                    b.Must(m => m.MatchAll());
+
+                return b;
+            });
 
         try
         {
             var indexPrefix = "quebrix-logs";
-            var response = await _client.SearchAsync<LogEvent>(s => s
+
+            // Main search request
+            var searchResponse = await _client.SearchAsync<LogEvent>(s => s
                 .Index(indexPrefix + "*")
                 .Query(boolQuery)
                 .From(from)
                 .Size(pageSize)
                 .Sort(ss => ss
-                    .Field("@timestamp", f => f.Order(SortOrder.Desc)))
-                , cancellationToken);
+                    .Descending("@timestamp")), cancellationToken);
 
-            if (!response.IsValidResponse)
+            if (!searchResponse.IsValid)
             {
-                _logger.LogError("Elasticsearch search failed: {DebugInfo}", response.DebugInformation);
+                _logger.LogError("Elasticsearch search failed: {DebugInfo}", searchResponse.DebugInformation);
                 return StatusCode(502, new LogSearchResponse
                 {
                     Error = "Search backend unavailable",
@@ -193,8 +194,8 @@ public sealed class LogsQueryController : ControllerBase
                 });
             }
 
-            // Get aggregations for filter suggestions
-            var aggsResponse = await _client.SearchAsync<LogEvent>(s => s
+            // Aggregation search for filter suggestions
+            var aggResponse = await _client.SearchAsync<LogEvent>(s => s
                 .Index(indexPrefix + "*")
                 .Size(0)
                 .Query(boolQuery)
@@ -210,20 +211,20 @@ public sealed class LogsQueryController : ControllerBase
             var applications = new List<AggregationItem>();
             var environments = new List<AggregationItem>();
 
-            if (aggsResponse.IsValidResponse && aggsResponse.Aggregations != null)
+            if (aggResponse.IsValid && aggResponse.Aggregations != null)
             {
-                levels = ExtractTerms(aggsResponse.Aggregations.Terms("levels"));
-                sources = ExtractTerms(aggsResponse.Aggregations.Terms("sources"));
-                applications = ExtractTerms(aggsResponse.Aggregations.Terms("applications"));
-                environments = ExtractTerms(aggsResponse.Aggregations.Terms("environments"));
+                levels = ExtractTerms(aggResponse.Aggregations.Terms<string>("levels"));
+                sources = ExtractTerms(aggResponse.Aggregations.Terms<string>("sources"));
+                applications = ExtractTerms(aggResponse.Aggregations.Terms<string>("applications"));
+                environments = ExtractTerms(aggResponse.Aggregations.Terms<string>("environments"));
             }
 
-            var events = response.Hits.Select(h => h.Source!).ToList();
+            var events = searchResponse.Hits.Select(h => h.Source).ToList();
 
             return Ok(new LogSearchResponse
             {
                 Events = events,
-                TotalCount = response.Total,
+                TotalCount = searchResponse.Total,
                 Page = page,
                 PageSize = pageSize,
                 Aggregations = new SearchAggregations
@@ -256,8 +257,8 @@ public sealed class LogsQueryController : ControllerBase
     {
         try
         {
-            var response = await _client.GetAsync<LogEvent>("quebrix-logs*", id, cancellationToken);
-            if (!response.IsValidResponse || !response.Found)
+            var response = await _client.GetAsync<LogEvent>(id, idx => idx.Index("quebrix-logs*"), cancellationToken);
+            if (!response.IsValid || !response.Found)
                 return NotFound();
 
             return Ok(response.Source);
@@ -274,53 +275,71 @@ public sealed class LogsQueryController : ControllerBase
     /// </summary>
     [HttpGet("suggestions/{field}")]
     [Produces("application/json")]
-    public async Task<IActionResult> GetSuggestions(string field, [FromQuery] string? query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetSuggestions(
+        string field,
+        [FromQuery] string? query,
+        CancellationToken cancellationToken)
     {
-        var allowedFields = new[] { "SourceContext", "Application", "Environment", "MachineName", "TraceId", "CorrelationId" };
+        var allowedFields = new[]
+        {
+            "SourceContext",
+            "Application",
+            "Environment",
+            "MachineName",
+            "@tr",
+            "@l"
+        };
+
         if (!allowedFields.Contains(field))
-            return BadRequest(new { Error = $"Field '{field}' is not supported for suggestions" });
+            return BadRequest(new
+            {
+                Error = $"Field '{field}' is not supported."
+            });
+
+        var keywordField = $"{field}.keyword";
 
         try
         {
             var response = await _client.SearchAsync<LogEvent>(s => s
-                .Index("quebrix-logs*")
-                .Size(0)
-                .Query(q => q
-                    .Bool(b => b
-                        .Filter(f => f
-                            .Prefix(new PrefixQuery
-                            {
-                                Field = field,
-                                Value = query ?? ""
-                            }))
-                    ))
-                .Aggregations(aggs => aggs
-                    .Terms("values", t => t.Field(field).Size(20))
-                ), cancellationToken);
-
-            var values = new List<string>();
-            if (response.IsValidResponse && response.Aggregations != null)
-            {
-                var terms = response.Aggregations.Terms("values");
-                if (terms?.Buckets != null)
-                {
-                    foreach (var bucket in terms.Buckets)
+                    .Index("quebrix-logs*")
+                    .Size(0)
+                    .Query(q =>
                     {
-                        values.Add(bucket.Key?.ToString() ?? "");
-                    }
-                }
-            }
+                        if (string.IsNullOrWhiteSpace(query))
+                            return q.MatchAll();
+
+                        return q.Prefix(p => p
+                            .Field(keywordField)
+                            .Value(query));
+                    })
+                    .Aggregations(a => a
+                        .Terms("values", t => t
+                            .Field(keywordField)
+                            .Size(20)
+                            .Order(o => o.CountDescending())
+                        )
+                    ),
+                cancellationToken);
+
+            var values = response.Aggregations?
+                .Terms("values")?
+                .Buckets
+                .Select(x => x.Key)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList() ?? [];
 
             return Ok(new { values });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting suggestions for {Field}", field);
-            return Ok(new { values = new List<string>() });
+            _logger.LogError(ex,
+                "Error getting suggestions for {Field}", field);
+
+            return Ok(new { values = Array.Empty<string>() });
         }
     }
 
-    private static List<AggregationItem> ExtractTerms(TermsAggregate? termsAgg)
+    private static List<AggregationItem> ExtractTerms(TermsAggregate<string>? termsAgg)
     {
         var items = new List<AggregationItem>();
         if (termsAgg?.Buckets != null)
@@ -329,7 +348,7 @@ public sealed class LogsQueryController : ControllerBase
             {
                 items.Add(new AggregationItem
                 {
-                    Key = bucket.Key?.ToString() ?? "unknown",
+                    Key = bucket.Key,
                     Count = bucket.DocCount ?? 0
                 });
             }

@@ -20,6 +20,7 @@ using QUEBRIX.Logger.Security.Authorization;
 using QUEBRIX.Logger.Security.RateLimiting;
 using QUEBRIX.Logger.Storage.Abstractions;
 using QUEBRIX.Logger.Storage.Elasticsearch;
+using Nest;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,7 +72,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Elasticsearch
+// Elasticsearch (Elastic.Clients.Elasticsearch for ingestion pipeline)
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<QuebrixElasticsearchOptions>>().Value;
@@ -87,6 +88,25 @@ builder.Services.AddSingleton(sp =>
     }
 
     return new ElasticsearchClient(settings);
+});
+
+// NEST (for UI query layer)
+builder.Services.AddSingleton<IElasticClient>(sp =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<QuebrixElasticsearchOptions>>().Value;
+    var uri = options.Urls.FirstOrDefault() ?? new Uri("http://216.65.200.197:9200");
+
+    var settings = new ConnectionSettings(uri)
+        .DefaultMappingFor<QUEBRIX.Logger.Contracts.LogEvent>(m => m.IndexName("quebrix-logs"))
+        .EnableDebugMode()
+        .ServerCertificateValidationCallback((_, _, _, _) => true);
+
+    if (!string.IsNullOrEmpty(options.Username) && !string.IsNullOrEmpty(options.Password))
+    {
+        settings = settings.BasicAuthentication(options.Username, options.Password);
+    }
+
+    return new ElasticClient(settings);
 });
 
 // Storage

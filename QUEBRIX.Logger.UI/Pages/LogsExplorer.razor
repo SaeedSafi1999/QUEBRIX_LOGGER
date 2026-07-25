@@ -673,9 +673,10 @@
         await SearchAsync();
     }
 
-    private async Task OnSourceFilterChanged()
+    private Task OnSourceFilterChanged()
     {
         // Just re-render to update filtered sources list
+        return Task.CompletedTask;
     }
 
     private async Task OnTraceFilterChanged()
