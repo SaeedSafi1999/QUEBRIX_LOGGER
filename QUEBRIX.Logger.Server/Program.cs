@@ -88,6 +88,7 @@ builder.Services.AddSingleton(sp =>
     }
 
     return new ElasticsearchClient(settings);
+    
 });
 
 // NEST (for UI query layer)
