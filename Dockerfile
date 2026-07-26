@@ -1,15 +1,8 @@
-# =============================================================================
-# QUEBRIX Logger Server - Dockerfile
-# =============================================================================
-# Multi-stage build for production-ready deployment
-# =============================================================================
-
-# Build Stage
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy solution and project files
 COPY QUEBRIX.Logger.sln .
+
 COPY QUEBRIX.Logger.Common/*.csproj ./QUEBRIX.Logger.Common/
 COPY QUEBRIX.Logger.Contracts/*.csproj ./QUEBRIX.Logger.Contracts/
 COPY QUEBRIX.Logger.Storage.Abstractions/*.csproj ./QUEBRIX.Logger.Storage.Abstractions/
@@ -20,34 +13,36 @@ COPY QUEBRIX.Logger.Server/*.csproj ./QUEBRIX.Logger.Server/
 COPY QUEBRIX.Logger.Sink/*.csproj ./QUEBRIX.Logger.Sink/
 COPY QUEBRIX.Logger.SDK/*.csproj ./QUEBRIX.Logger.SDK/
 
-# Restore dependencies
-RUN dotnet restore
+# Restore ONLY the server project
+RUN dotnet restore ./QUEBRIX.Logger.Server/QUEBRIX.Logger.Server.csproj
 
 # Copy all source files
 COPY . .
 
-# Build and publish the server project
-WORKDIR /src/QUEBRIX.Logger.Server
-RUN dotnet publish -c Release -o /app/publish --no-restore
+# Publish ONLY the server project
+RUN dotnet publish ./QUEBRIX.Logger.Server/QUEBRIX.Logger.Server.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore
 
-# Runtime Stage
+# ================= Runtime =================
+
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+
 WORKDIR /app
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y curl --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy published artifacts
 COPY --from=build /app/publish .
 
-# Create non-root user
 RUN addgroup --system --gid 1001 quebrix && \
     adduser --system --uid 1001 --ingroup quebrix quebrix && \
     chown -R quebrix:quebrix /app
 
 USER quebrix
 
-# Environment variables (overridable at runtime)
 ENV QUEBRIX_APPLICATION="QUEBRIX Logger"
 ENV QUEBRIX_ENVIRONMENT="Production"
 ENV QUEBRIX_LISTENURL="http://0.0.0.0:8080"
