@@ -1,15 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <RootNamespace>QUEBRIX.Logger.Contracts</RootNamespace>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<RootNamespace>QUEBRIX.Logger.Contracts</RootNamespace>
 
-  <ItemGroup>
-    <ProjectReference Include="..\QUEBRIX.Logger.Common\QUEBRIX.Logger.Common.csproj" />
-  </ItemGroup>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<IsPackable>true</IsPackable>
+		<Version>1.0.0</Version>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\QUEBRIX.Logger.Common\QUEBRIX.Logger.Common.csproj" />
+	</ItemGroup>
 
 </Project>

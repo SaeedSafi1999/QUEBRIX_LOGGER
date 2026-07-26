@@ -19,7 +19,6 @@ COPY QUEBRIX.Logger.Core/*.csproj ./QUEBRIX.Logger.Core/
 COPY QUEBRIX.Logger.Server/*.csproj ./QUEBRIX.Logger.Server/
 COPY QUEBRIX.Logger.Sink/*.csproj ./QUEBRIX.Logger.Sink/
 COPY QUEBRIX.Logger.SDK/*.csproj ./QUEBRIX.Logger.SDK/
-COPY QUEBRIX.Logger.Tests/*.csproj ./QUEBRIX.Logger.Tests/
 
 # Restore dependencies
 RUN dotnet restore
