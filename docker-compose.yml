@@ -58,7 +58,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       QUEBRIX_APPLICATION: "QUEBRIX Logger"
       QUEBRIX_ENVIRONMENT: Production
-      QUEBRIX_LISTENURL: http://0.0.0.0:6062
+      QUEBRIX_LISTENURL: http://0.0.0.0:8080
       QUEBRIX_ELASTICSEARCH__URLS__0: http://elasticsearch:9200
       QUEBRIX_ELASTICSEARCH__DEFAULTINDEXPREFIX: quebrix-logs
       QUEBRIX_ELASTICSEARCH__NUMBEROFSHARDS: 1
@@ -69,9 +69,9 @@ services:
       QUEBRIX_ELASTICSEARCH__MAXRETRIES: 3
       QUEBRIX_ELASTICSEARCH__RETRYDELAYMILLISECONDS: 1000
     ports:
-      - "6062:6062"
+      - "6062:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:6062/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 20
@@ -87,11 +87,11 @@ services:
       quebrix-server:
         condition: service_healthy
     environment:
-      API_BASE_URL: http://quebrix-server:6062
+      API_BASE_URL: http://quebrix-server:8080
     ports:
-      - "6063:6063"
+      - "6063:80"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:6063/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 20
