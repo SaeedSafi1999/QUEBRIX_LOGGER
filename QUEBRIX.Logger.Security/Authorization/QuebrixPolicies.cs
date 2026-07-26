@@ -30,20 +30,20 @@ public static class QuebrixPolicies
         options.AddPolicy(IngestionPolicy, policy =>
         {
             policy.RequireAuthenticatedUser();
-            policy.AddAuthenticationSchemes("QuebrixAuth", "Bearer");
+            policy.AddAuthenticationSchemes("QuebrixAuth");
         });
 
         options.AddPolicy(AdminPolicy, policy =>
         {
             policy.RequireAuthenticatedUser();
-            policy.AddAuthenticationSchemes("QuebrixAuth", "Bearer");
+            policy.AddAuthenticationSchemes("QuebrixAuth");
             policy.RequireClaim("QuebrixAuthType", "ApiKey");
         });
 
         options.AddPolicy(ReadOnlyPolicy, policy =>
         {
             policy.RequireAuthenticatedUser();
-            policy.AddAuthenticationSchemes("Bearer");
+            policy.AddAuthenticationSchemes("QuebrixAuth");
         });
     }
 }
