@@ -1,31 +1,19 @@
-# =============================================================================
-# QUEBRIX Logger Platform - Docker Compose
-# =============================================================================
-# Deploys the complete QUEBRIX logging platform:
-#   - Elasticsearch 8.x for log storage
-#   - Kibana for log visualization and management
-#   - QUEBRIX Logger Server for log ingestion API
-#   - QUEBRIX Logger UI for Blazor WebAssembly frontend
-# =============================================================================
-
-version: "3.9"
-
 services:
   elasticsearch:
     image: elasticsearch:8.16.4
     container_name: quebrix-elasticsearch
     restart: unless-stopped
     environment:
-      - cluster.name=quebrix-cluster
-      - node.name=quebrix-node
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - xpack.security.enabled=false
-      - xpack.security.enrollment.enabled=false
-      - xpack.security.http.ssl.enabled=false
-      - xpack.security.transport.ssl.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - network.host=0.0.0.0
+      cluster.name: quebrix-cluster
+      node.name: quebrix-node
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      network.host: 0.0.0.0
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     ulimits:
       memlock:
         soft: -1
@@ -36,22 +24,22 @@ services:
       - "9222:9200"
       - "9300:9300"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=green&timeout=5s" ]
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200 >/dev/null || exit 1"]
       interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 20
       start_period: 30s
     networks:
       - quebrix-network
 
   kibana:
-    image:  kibana:8.16.4
+    image: kibana:8.16.4
     container_name: quebrix-kibana
     restart: unless-stopped
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - XPACK_SECURITY_ENABLED=false
-      - SERVER_NAME=quebrix-kibana
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      XPACK_SECURITY_ENABLED: "false"
+      SERVER_NAME: quebrix-kibana
     ports:
       - "5661:5601"
     depends_on:
@@ -61,62 +49,59 @@ services:
       - quebrix-network
 
   quebrix-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: quebrix-server:latest
     container_name: quebrix-server
     restart: unless-stopped
-    environment:
-      - QUEBRIX_APPLICATION=QUEBRIX Logger
-      - QUEBRIX_ENVIRONMENT=Production
-      - QUEBRIX_LISTENURL=http://0.0.0.0:8080
-      - QUEBRIX_ELASTICSEARCH__URLS__0=http://elasticsearch:9200
-      - QUEBRIX_ELASTICSEARCH__DEFAULTINDEXPREFIX=quebrix-logs
-      - QUEBRIX_ELASTICSEARCH__NUMBEROFSHARDS=1
-      - QUEBRIX_ELASTICSEARCH__NUMBEROFREPLICAS=0
-      - QUEBRIX_ELASTICSEARCH__ENABLEILM=true
-      - QUEBRIX_ELASTICSEARCH__BULKBATCHSIZE=1000
-      - QUEBRIX_ELASTICSEARCH__BULKCONCURRENCY=4
-      - QUEBRIX_ELASTICSEARCH__MAXRETRIES=3
-      - QUEBRIX_ELASTICSEARCH__RETRYDELAYMILLISECONDS=1000
-      - ASPNETCORE_ENVIRONMENT=Production
-    ports:
-      - "6062:8080"
     depends_on:
       elasticsearch:
         condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      QUEBRIX_APPLICATION: "QUEBRIX Logger"
+      QUEBRIX_ENVIRONMENT: Production
+      QUEBRIX_LISTENURL: http://0.0.0.0:8080
+      QUEBRIX_ELASTICSEARCH__URLS__0: http://elasticsearch:9200
+      QUEBRIX_ELASTICSEARCH__DEFAULTINDEXPREFIX: quebrix-logs
+      QUEBRIX_ELASTICSEARCH__NUMBEROFSHARDS: 1
+      QUEBRIX_ELASTICSEARCH__NUMBEROFREPLICAS: 0
+      QUEBRIX_ELASTICSEARCH__ENABLEILM: "true"
+      QUEBRIX_ELASTICSEARCH__BULKBATCHSIZE: 1000
+      QUEBRIX_ELASTICSEARCH__BULKCONCURRENCY: 4
+      QUEBRIX_ELASTICSEARCH__MAXRETRIES: 3
+      QUEBRIX_ELASTICSEARCH__RETRYDELAYMILLISECONDS: 1000
+    ports:
+      - "6062:8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/health || exit 1"]
       interval: 15s
       timeout: 5s
-      retries: 3
+      retries: 20
       start_period: 30s
     networks:
       - quebrix-network
 
   quebrix-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile.ui
+    image: quebrix-ui:latest
     container_name: quebrix-ui
     restart: unless-stopped
-    ports:
-      - "6063:80"
     depends_on:
       quebrix-server:
         condition: service_healthy
+    environment:
+      API_BASE_URL: http://quebrix-server:8080
+    ports:
+      - "6063:80"
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:80/" ]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
       interval: 15s
       timeout: 5s
-      retries: 3
-      start_period: 10s
+      retries: 20
+      start_period: 15s
     networks:
       - quebrix-network
 
 volumes:
   quebrix-es-data:
-    driver: local
 
 networks:
   quebrix-network:
