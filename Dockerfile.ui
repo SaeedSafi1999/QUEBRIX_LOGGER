@@ -1,0 +1,44 @@
+# =============================================================================
+# QUEBRIX Logger UI - Dockerfile
+# =============================================================================
+# Multi-stage build for Blazor WebAssembly frontend with Nginx
+# =============================================================================
+
+# Build Stage
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy solution and project files for dependency restore
+COPY QUEBRIX.Logger.sln .
+COPY QUEBRIX.Logger.Common/*.csproj ./QUEBRIX.Logger.Common/
+COPY QUEBRIX.Logger.Contracts/*.csproj ./QUEBRIX.Logger.Contracts/
+COPY QUEBRIX.Logger.UI/*.csproj ./QUEBRIX.Logger.UI/
+
+# Restore dependencies
+RUN dotnet restore QUEBRIX.Logger.UI/QUEBRIX.Logger.UI.csproj
+
+# Copy all source files (only what's needed for UI)
+COPY QUEBRIX.Logger.Common/ ./QUEBRIX.Logger.Common/
+COPY QUEBRIX.Logger.Contracts/ ./QUEBRIX.Logger.Contracts/
+COPY QUEBRIX.Logger.UI/ ./QUEBRIX.Logger.UI/
+
+# Build and publish the UI project
+WORKDIR /src/QUEBRIX.Logger.UI
+RUN dotnet publish -c Release -o /app/publish --no-restore
+
+# Runtime Stage - Nginx for serving Blazor WASM
+FROM nginx:alpine AS runtime
+WORKDIR /usr/share/nginx/html
+
+# Copy published Blazor files
+COPY --from=build /app/publish/wwwroot .
+
+# Copy custom Nginx configuration
+COPY QUEBRIX.Logger.UI/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://localhost:80/ || exit 1
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]

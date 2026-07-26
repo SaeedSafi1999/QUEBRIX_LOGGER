@@ -24,7 +24,8 @@ Thumbs.db
 
 # Docker
 docker-compose*.yml
-Dockerfile*
+Dockerfile
+Dockerfile.*
 
 # Tests
 TestResults/

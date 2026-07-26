@@ -4,7 +4,8 @@
 # Deploys the complete QUEBRIX logging platform:
 #   - Elasticsearch 8.x for log storage
 #   - Kibana for log visualization and management
-#   - QUEBRIX Logger Server for log ingestion
+#   - QUEBRIX Logger Server for log ingestion API
+#   - QUEBRIX Logger UI for Blazor WebAssembly frontend
 # =============================================================================
 
 version: "3.9"
@@ -32,7 +33,7 @@ services:
     volumes:
       - quebrix-es-data:/usr/share/elasticsearch/data
     ports:
-      - "9200:9200"
+      - "9222:9200"
       - "9300:9300"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=green&timeout=5s" ]
@@ -52,7 +53,7 @@ services:
       - XPACK_SECURITY_ENABLED=false
       - SERVER_NAME=quebrix-kibana
     ports:
-      - "5601:5601"
+      - "5661:5601"
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -80,7 +81,7 @@ services:
       - QUEBRIX_ELASTICSEARCH__RETRYDELAYMILLISECONDS=1000
       - ASPNETCORE_ENVIRONMENT=Production
     ports:
-      - "8080:8080"
+      - "6062:8080"
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -90,6 +91,26 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - quebrix-network
+
+  quebrix-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: quebrix-ui
+    restart: unless-stopped
+    ports:
+      - "6063:80"
+    depends_on:
+      quebrix-server:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:80/" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - quebrix-network
 

@@ -15,7 +15,7 @@ public sealed class QuebrixElasticsearchOptions
     /// <summary>
     /// Elasticsearch server URIs.
     /// </summary>
-    public List<Uri> Urls { get; set; } = new() { new Uri("http://216.65.200.197:9200") };
+    public List<Uri> Urls { get; set; } = new() { new Uri("http://localhost:9222") };
 
     /// <summary>
     /// Authentication username.

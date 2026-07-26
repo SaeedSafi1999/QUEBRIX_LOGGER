@@ -76,7 +76,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<QuebrixElasticsearchOptions>>().Value;
-    var uri = options.Urls.FirstOrDefault() ?? new Uri("http://216.65.200.197:9200");
+    var uri = options.Urls.FirstOrDefault() ?? new Uri("http://localhost:9222");
     var settings = new ElasticsearchClientSettings(uri)
         .DefaultMappingFor<LogEvent>(m => m.IndexName("quebrix-logs"))
         .EnableDebugMode()
@@ -94,7 +94,7 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<IElasticClient>(sp =>
 {
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<QuebrixElasticsearchOptions>>().Value;
-    var uri = options.Urls.FirstOrDefault() ?? new Uri("http://216.65.200.197:9200");
+    var uri = options.Urls.FirstOrDefault() ?? new Uri("http://localhost:9222");
 
     var settings = new ConnectionSettings(uri)
         .DefaultMappingFor<QUEBRIX.Logger.Contracts.LogEvent>(m => m.IndexName("quebrix-logs"))

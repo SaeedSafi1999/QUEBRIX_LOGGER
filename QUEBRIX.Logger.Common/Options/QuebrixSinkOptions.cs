@@ -13,7 +13,7 @@ public sealed class QuebrixSinkOptions
     /// <summary>
     /// The URL of the QUEBRIX Logger server.
     /// </summary>
-    public Uri Url { get; set; } = new Uri("http://localhost:8080");
+    public Uri Url { get; set; } = new Uri("http://localhost:6062");
 
     /// <summary>
     /// API key for authentication.
