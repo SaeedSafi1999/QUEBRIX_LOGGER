@@ -1,3 +1,6 @@
+# ================= Build Stage =================
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+
 WORKDIR /src
 
 # Copy solution and project files
@@ -13,27 +16,26 @@ COPY QUEBRIX.Logger.Server/*.csproj ./QUEBRIX.Logger.Server/
 COPY QUEBRIX.Logger.Sink/*.csproj ./QUEBRIX.Logger.Sink/
 COPY QUEBRIX.Logger.SDK/*.csproj ./QUEBRIX.Logger.SDK/
 
-# Restore ONLY the server project
+# Restore only the server project
 RUN dotnet restore ./QUEBRIX.Logger.Server/QUEBRIX.Logger.Server.csproj
 
-# Copy all source files
+# Copy source
 COPY . .
 
-# Publish ONLY the server project
+# Publish
 RUN dotnet publish ./QUEBRIX.Logger.Server/QUEBRIX.Logger.Server.csproj \
     -c Release \
     -o /app/publish \
     --no-restore
 
-# ================= Runtime =================
-
+# ================= Runtime Stage =================
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
 
