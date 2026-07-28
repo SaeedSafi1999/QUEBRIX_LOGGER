@@ -7,6 +7,9 @@ using Serilog.Events;
 using QUEBRIX.Logger.Common;
 using QUEBRIX.Logger.Common.Options;
 using QuebrixLogEvent = QUEBRIX.Logger.Contracts.LogEvent;
+using QUEBRIX.Logger.Core.Ingestion;
+using System.Threading.Tasks;
+using QUEBRIX.Logger.Storage.Abstractions;
 
 namespace QUEBRIX.Logger.Sink;
 
@@ -18,6 +21,7 @@ namespace QUEBRIX.Logger.Sink;
 public sealed class QuebrixSink : ILogEventSink, IDisposable
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogStorage _logStorage;
     private readonly QuebrixSinkOptions _options;
     private readonly QuebrixLogEventConverter _converter;
     private readonly BatchProcessor _batchProcessor;
@@ -35,13 +39,13 @@ public sealed class QuebrixSink : ILogEventSink, IDisposable
     /// </summary>
     /// <param name="options">Sink configuration options.</param>
     /// <param name="httpClient">Optional HTTP client (created automatically if not provided).</param>
-    public QuebrixSink(QuebrixSinkOptions options, HttpClient? httpClient = null)
+    public QuebrixSink(QuebrixSinkOptions options, ILogStorage logStorage, HttpClient? httpClient = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _httpClient = httpClient ?? CreateDefaultHttpClient(options);
         _converter = new QuebrixLogEventConverter(options);
         _bufferManager = new BufferManager(options);
-
+        _logStorage = logStorage;
         _batchProcessor = new BatchProcessor(
             options,
             _bufferManager,
@@ -65,6 +69,7 @@ public sealed class QuebrixSink : ILogEventSink, IDisposable
             if (eventLevel < minLevel) return;
 
             var quebrixEvent = _converter.Convert(serilogEvent);
+            _logStorage.StoreAsync(quebrixEvent);
             _batchProcessor.Add(quebrixEvent);
         }
         catch (Exception ex)

@@ -3,6 +3,8 @@ using Serilog.Configuration;
 using Serilog.Events;
 using QUEBRIX.Logger.Common;
 using QUEBRIX.Logger.Common.Options;
+using QUEBRIX.Logger.Core.Ingestion;
+using QUEBRIX.Logger.Storage.Abstractions;
 
 namespace QUEBRIX.Logger.Sink;
 
@@ -29,6 +31,7 @@ public static class QuebrixSinkConfigurationExtensions
         this LoggerSinkConfiguration sinkConfiguration,
         Action<QuebrixSinkOptions> configureOptions,
         LogEventLevel restrictedToMinimumLevel = LogEventLevel.Verbose,
+        ILogStorage logStorage = null,
         int? batchSize = null,
         int? period = null,
         int? queueSize = null,
@@ -50,8 +53,7 @@ public static class QuebrixSinkConfigurationExtensions
         if (queueSize.HasValue) options.QueueSize = queueSize.Value;
         if (timeout.HasValue) options.TimeoutSeconds = timeout.Value;
         if (compression.HasValue) options.UseCompression = compression.Value;
-
-        var sink = new QuebrixSink(options);
+        var sink = new QuebrixSink(options,logStorage);
 
         return sinkConfiguration.Sink(sink, restrictedToMinimumLevel);
     }

@@ -11,7 +11,7 @@
 		<IsPackable>true</IsPackable>
 		<PackageId>QUEBRIX.Logger.Sink</PackageId>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>1.0.0</Version>
+		<Version>1.0.2</Version>
 		<Title>QUEBRIX Logger - Serilog Sink</Title>
 		<Description>Enterprise-grade Serilog sink for QUEBRIX Logger - a modern, high-performance logging platform</Description>
 		<Authors>QUEBRIX</Authors>
@@ -40,6 +40,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\QUEBRIX.Logger.Common\QUEBRIX.Logger.Common.csproj" />
 		<ProjectReference Include="..\QUEBRIX.Logger.Contracts\QUEBRIX.Logger.Contracts.csproj" />
+		<ProjectReference Include="..\QUEBRIX.Logger.Core\QUEBRIX.Logger.Core.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
