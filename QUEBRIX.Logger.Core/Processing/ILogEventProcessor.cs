@@ -1,3 +1,4 @@
+using QUEBRIX.Logger.Common;
 using QUEBRIX.Logger.Contracts;
 
 namespace QUEBRIX.Logger.Core.Processing;
@@ -79,6 +80,22 @@ public sealed class DefaultEnricher : ILogEventEnricher
         logEvent.Host ??= HostName;
         if (!string.IsNullOrEmpty(Application)) logEvent.Application ??= Application;
         if (!string.IsNullOrEmpty(EnvironmentName)) logEvent.Environment ??= EnvironmentName;
+
+        // Ensure Message (@m) is never null
+        if (string.IsNullOrEmpty(logEvent.Message))
+        {
+            logEvent.Message = logEvent.MessageTemplate ?? "No message";
+        }
+
+        // Ensure Exception (@x) is never null - use empty string when no exception
+        logEvent.Exception ??= string.Empty;
+
+        // Ensure MessageTemplate (@mt) is never null
+        logEvent.MessageTemplate ??= "Text";
+
+        // Ensure Level (@level) is never null
+        logEvent.Level ??= QuebrixLogLevel.Information.ToString();
+
         return ValueTask.CompletedTask;
     }
 }

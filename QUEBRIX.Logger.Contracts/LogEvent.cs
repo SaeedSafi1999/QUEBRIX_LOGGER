@@ -23,9 +23,10 @@ public sealed class LogEvent
 
     /// <summary>
     /// The rendered/formatted log message (equivalent to Serilog's @m).
+    /// Must not be null when emitted.
     /// </summary>
     [JsonPropertyName("@m")]
-    public string? Message { get; set; }
+    public string Message { get; set; } = "No message";
 
     /// <summary>
     /// The message template (e.g. "User {UserId} logged in").
@@ -35,9 +36,10 @@ public sealed class LogEvent
 
     /// <summary>
     /// The exception information, if any (equivalent to Serilog's @x).
+    /// Empty string when no exception present.
     /// </summary>
     [JsonPropertyName("@x")]
-    public string? Exception { get; set; }
+    public string Exception { get; set; } = string.Empty;
 
     /// <summary>
     /// The event ID from Serilog event IDs (equivalent to Serilog's @i).

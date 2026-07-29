@@ -15,13 +15,13 @@ public class LogEvent
     public string Level { get; set; } = "Information";
 
     [JsonPropertyName("@m")]
-    public string? Message { get; set; }
+    public string Message { get; set; } = "No message";
 
     [JsonPropertyName("@mt")]
-    public string? MessageTemplate { get; set; }
+    public string MessageTemplate { get; set; } = "Text";
 
     [JsonPropertyName("@x")]
-    public string? Exception { get; set; }
+    public string Exception { get; set; } = string.Empty;
 
     [JsonPropertyName("@i")]
     public string? EventId { get; set; }

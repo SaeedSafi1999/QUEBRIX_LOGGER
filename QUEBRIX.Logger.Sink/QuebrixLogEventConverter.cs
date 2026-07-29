@@ -120,14 +120,24 @@ public sealed class QuebrixLogEventConverter
                 properties[tagKey] = tag;
         }
 
+        // Ensure rendered message is never null
+        var renderedMessage = serilogEvent.RenderMessage();
+        if (string.IsNullOrEmpty(renderedMessage))
+        {
+            renderedMessage = serilogEvent.MessageTemplate?.Text ?? "No message";
+        }
+
+        // Ensure exception string is never null - use empty string if no exception
+        var exceptionString = serilogEvent.Exception?.ToString() ?? string.Empty;
+
         // Build the log event with all Serilog-compatible fields
         var logEvent = new QuebrixLogEvent
         {
             Timestamp = serilogEvent.Timestamp.UtcDateTime,
             Level = level,
-            Message = serilogEvent.RenderMessage(),
+            Message = renderedMessage,
             MessageTemplate = serilogEvent.MessageTemplate?.Text ?? string.Empty,
-            Exception = serilogEvent.Exception?.ToString(),
+            Exception = exceptionString,
             SourceContext = sourceContext,
             RequestId = requestId,
             TraceId = traceId,
