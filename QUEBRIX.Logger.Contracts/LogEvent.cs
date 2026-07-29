@@ -23,19 +23,19 @@ public sealed class LogEvent
     /// <summary>
     /// The message template (e.g. "User {UserId} logged in").
     /// </summary>
-    [JsonPropertyName("@mt")]
-    public string MessageTemplate { get; set; } = string.Empty;
+    [JsonPropertyName("MessageTemplate")]
+    public string MessageTemplate { get; set; } = "Text";
 
     /// <summary>
     /// The rendered message with all properties substituted.
     /// </summary>
-    [JsonPropertyName("@m")]
+    [JsonPropertyName("RenderedMessage")]
     public string? RenderedMessage { get; set; }
 
     /// <summary>
     /// The exception information, if any.
     /// </summary>
-    [JsonPropertyName("@x")]
+    [JsonPropertyName("Exception")]
     public string? Exception { get; set; }
 
     /// <summary>

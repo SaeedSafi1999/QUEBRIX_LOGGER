@@ -49,10 +49,14 @@ public sealed class LogsQueryController : ControllerBase
                 .MultiMatch(m => m
                     .Fields(f => f
                         .Field("@m", 3.0)
+                        .Field("MessageTemplate", 3.0)
+                        .Field("Exception", 1.5)
+                        .Field("RenderedMessage")
                         .Field("@x", 1.5)
                         .Field("SourceContext", 2.0)
                         .Field("@mt", 2.0)
                         .Field("Application")
+                        .Field("Message")
                         .Field("Environment")
                         .Field("MachineName")
                         .Field("@tr", 1.5)
@@ -267,6 +271,62 @@ public sealed class LogsQueryController : ControllerBase
         {
             _logger.LogError(ex, "Error fetching log event {Id}", id);
             return StatusCode(502, new { Error = "Failed to fetch log event" });
+        }
+    }
+
+    /// <summary>
+    /// Returns all log events without any filters (match_all query).
+    /// Supports pagination via query parameters.
+    /// </summary>
+    [HttpGet("all")]
+    [Produces("application/json")]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 500);
+        var from = (page - 1) * pageSize;
+
+        try
+        {
+            var response = await _client.SearchAsync<LogEvent>(s => s
+                .Index("quebrix-logs*")
+                .Query(q => q.MatchAll())
+                .From(from)
+                .Size(pageSize)
+                .Sort(ss => ss.Descending("@timestamp")), cancellationToken);
+
+            if (!response.IsValid)
+            {
+                _logger.LogError("Elasticsearch search failed: {DebugInfo}", response.DebugInformation);
+                return StatusCode(502, new LogSearchResponse
+                {
+                    Error = "Search backend unavailable",
+                    TotalCount = 0,
+                    Events = []
+                });
+            }
+
+            var events = response.Hits.Select(h => h.Source).ToList();
+            return Ok(new LogSearchResponse
+            {
+                Events = events,
+                TotalCount = response.Total,
+                Page = page,
+                PageSize = pageSize
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching all logs");
+            return StatusCode(502, new LogSearchResponse
+            {
+                Error = "Failed to fetch all logs: " + ex.Message,
+                TotalCount = 0,
+                Events = []
+            });
         }
     }
 

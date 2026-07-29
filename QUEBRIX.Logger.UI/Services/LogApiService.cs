@@ -48,6 +48,28 @@ public class LogApiService
     }
 
     /// <summary>
+    /// Fetches all logs from the backend (match_all query, paginated).
+    /// </summary>
+    public async Task<LogSearchResponse> GetAllAsync(int page = 1, int pageSize = 50, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await _http.GetFromJsonAsync<LogSearchResponse>($"api/logs/all?page={page}&pageSize={pageSize}", JsonOptions, ct);
+            return response ?? new LogSearchResponse { Error = "Empty response" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching all logs");
+            return new LogSearchResponse
+            {
+                Error = ex.Message,
+                TotalCount = 0,
+                Events = new List<LogEvent>()
+            };
+        }
+    }
+
+    /// <summary>
     /// Gets a single log event by ID.
     /// </summary>
     public async Task<LogEvent?> GetByIdAsync(string id, CancellationToken ct = default)

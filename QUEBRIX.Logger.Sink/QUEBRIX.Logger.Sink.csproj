@@ -11,7 +11,7 @@
 		<IsPackable>true</IsPackable>
 		<PackageId>QUEBRIX.Logger.Sink</PackageId>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>1.0.5</Version>
+		<Version>1.0.6</Version>
 		<Title>QUEBRIX Logger - Serilog Sink</Title>
 		<Description>Enterprise-grade Serilog sink for QUEBRIX Logger - a modern, high-performance logging platform</Description>
 		<Authors>QUEBRIX</Authors>

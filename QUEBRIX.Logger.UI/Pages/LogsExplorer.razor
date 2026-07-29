@@ -35,6 +35,9 @@
                 <i class="fas @(autoRefresh ? "fa-pause" : "fa-play")"></i>
                 <span class="auto-refresh-text">@(autoRefresh ? "Pause" : "Auto")</span>
             </button>
+            <button class="btn btn-success" @onclick="FetchAllAsync" title="Show all logs">
+                <i class="fas fa-list"></i> Show All
+            </button>
         </div>
         <div class="toolbar-right">
             <span class="result-count">
@@ -633,6 +636,39 @@
             Page = currentPage,
             PageSize = currentPageSize
         };
+    }
+
+    private async Task FetchAllAsync()
+    {
+        isLoading = true;
+        error = null;
+        selectedLog = null;
+
+        try
+        {
+            var response = await Api.GetAllAsync(1, currentPageSize);
+            if (!string.IsNullOrEmpty(response.Error))
+            {
+                error = response.Error;
+            }
+            else
+            {
+                logs = response.Events;
+                totalCount = response.TotalCount;
+                currentPage = 1;
+                totalPages = (int)Math.Ceiling((double)totalCount / currentPageSize);
+                if (totalPages < 1) totalPages = 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to fetch all logs: {ex.Message}";
+            Logger.LogError(ex, "FetchAll failed");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task RefreshAsync()
