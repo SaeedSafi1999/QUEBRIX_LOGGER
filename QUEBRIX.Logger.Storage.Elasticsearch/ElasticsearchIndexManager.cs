@@ -8,6 +8,7 @@ namespace QUEBRIX.Logger.Storage.Elasticsearch;
 /// <summary>
 /// Manages Elasticsearch index creation and templates for QUEBRIX log events.
 /// Thread-safe with singleton initialization pattern.
+/// Field mappings follow Serilog Elasticsearch schema convention (@timestamp, @level, @m, @mt, @x, @tr, @sp, @l, @i).
 /// </summary>
 public sealed class ElasticsearchIndexManager : IDisposable
 {
@@ -84,20 +85,28 @@ public sealed class ElasticsearchIndexManager : IDisposable
                     {
                         Properties = new Elastic.Clients.Elasticsearch.Mapping.Properties
                         {
-                            { "timestamp", new Elastic.Clients.Elasticsearch.Mapping.DateProperty() },
-                            { "level", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "messageTemplate", new Elastic.Clients.Elasticsearch.Mapping.TextProperty() },
-                            { "renderedMessage", new Elastic.Clients.Elasticsearch.Mapping.TextProperty() },
-                            { "exception", new Elastic.Clients.Elasticsearch.Mapping.TextProperty() },
-                            { "machineName", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "processId", new Elastic.Clients.Elasticsearch.Mapping.IntegerNumberProperty() },
-                            { "threadId", new Elastic.Clients.Elasticsearch.Mapping.IntegerNumberProperty() },
-                            { "environment", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "application", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "host", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "traceId", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "spanId", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
-                            { "correlationId", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() }
+                            // Serilog standard fields
+                            { "@timestamp", new Elastic.Clients.Elasticsearch.Mapping.DateProperty() },
+                            { "@level", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "@m", new Elastic.Clients.Elasticsearch.Mapping.TextProperty() },
+                            { "@mt", new Elastic.Clients.Elasticsearch.Mapping.TextProperty() },
+                            { "@x", new Elastic.Clients.Elasticsearch.Mapping.TextProperty() },
+                            { "@i", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "@tr", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "@sp", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "@l", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+
+                            // Custom QUEBRIX fields
+                            { "SourceContext", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "Application", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "Environment", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "MachineName", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "ProcessId", new Elastic.Clients.Elasticsearch.Mapping.IntegerNumberProperty() },
+                            { "ThreadId", new Elastic.Clients.Elasticsearch.Mapping.IntegerNumberProperty() },
+                            { "Host", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "RequestId", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "UserId", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() },
+                            { "SessionId", new Elastic.Clients.Elasticsearch.Mapping.KeywordProperty() }
                         },
                         Dynamic = Elastic.Clients.Elasticsearch.Mapping.DynamicMapping.True
                     }

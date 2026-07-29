@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Nest;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -20,7 +21,6 @@ using QUEBRIX.Logger.Security.Authorization;
 using QUEBRIX.Logger.Security.RateLimiting;
 using QUEBRIX.Logger.Storage.Abstractions;
 using QUEBRIX.Logger.Storage.Elasticsearch;
-using Nest;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -88,17 +88,41 @@ builder.Services.AddSingleton(sp =>
     }
 
     return new ElasticsearchClient(settings);
-
 });
 
-// NEST (for UI query layer)
+// NEST (for UI query layer) - with explicit property mappings for @-prefixed Serilog field names
 builder.Services.AddSingleton<IElasticClient>(sp =>
 {
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<QuebrixElasticsearchOptions>>().Value;
     var uri =  new Uri("http://elasticsearch:9200");
 
+    // Configure NEST property mappings to match Serilog @-prefixed field names
+    // This is needed because NEST uses Newtonsoft.Json and doesn't respect System.Text.Json's JsonPropertyName attributes
     var settings = new ConnectionSettings(uri)
-        .DefaultMappingFor<QUEBRIX.Logger.Contracts.LogEvent>(m => m.IndexName("quebrix-logs"))
+        .DefaultFieldNameInferrer(p => p) // Disable camelCase conversion, use property names as-is
+        .DefaultMappingFor<LogEvent>(m => m
+            .IndexName("quebrix-logs")
+            .PropertyName(p => p.Timestamp, "@timestamp")
+            .PropertyName(p => p.Level, "@level")
+            .PropertyName(p => p.Message, "@m")
+            .PropertyName(p => p.MessageTemplate, "@mt")
+            .PropertyName(p => p.Exception, "@x")
+            .PropertyName(p => p.EventId, "@i")
+            .PropertyName(p => p.TraceId, "@tr")
+            .PropertyName(p => p.SpanId, "@sp")
+            .PropertyName(p => p.CorrelationId, "@l")
+            .PropertyName(p => p.SourceContext, "SourceContext")
+            .PropertyName(p => p.Application, "Application")
+            .PropertyName(p => p.Environment, "Environment")
+            .PropertyName(p => p.MachineName, "MachineName")
+            .PropertyName(p => p.ProcessId, "ProcessId")
+            .PropertyName(p => p.ThreadId, "ThreadId")
+            .PropertyName(p => p.RequestId, "RequestId")
+            .PropertyName(p => p.UserId, "UserId")
+            .PropertyName(p => p.SessionId, "SessionId")
+            .PropertyName(p => p.Host, "Host")
+            .PropertyName(p => p.Properties, "Properties")
+        )
         .EnableDebugMode()
         .ServerCertificateValidationCallback((_, _, _, _) => true);
 

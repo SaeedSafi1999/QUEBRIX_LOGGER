@@ -4,7 +4,8 @@ using QUEBRIX.Logger.Common;
 namespace QUEBRIX.Logger.Contracts;
 
 /// <summary>
-/// Represents a single log event compatible with Serilog's log event model.
+/// Represents a single log event compatible with Serilog's Elasticsearch schema.
+/// Field names follow the Serilog convention (@timestamp, @level, @m, @mt, @x, @tr, @sp, @l, @i).
 /// </summary>
 public sealed class LogEvent
 {
@@ -15,28 +16,52 @@ public sealed class LogEvent
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// The log level.
+    /// The log level as a string (e.g. "Information", "Error", "Debug").
     /// </summary>
     [JsonPropertyName("@level")]
-    public QuebrixLogLevel Level { get; set; } = QuebrixLogLevel.Information;
+    public string Level { get; set; } = QuebrixLogLevel.Information.ToString();
+
+    /// <summary>
+    /// The rendered/formatted log message (equivalent to Serilog's @m).
+    /// </summary>
+    [JsonPropertyName("@m")]
+    public string? Message { get; set; }
 
     /// <summary>
     /// The message template (e.g. "User {UserId} logged in").
     /// </summary>
-    [JsonPropertyName("MessageTemplate")]
+    [JsonPropertyName("@mt")]
     public string MessageTemplate { get; set; } = "Text";
 
     /// <summary>
-    /// The rendered message with all properties substituted.
+    /// The exception information, if any (equivalent to Serilog's @x).
     /// </summary>
-    [JsonPropertyName("RenderedMessage")]
-    public string? RenderedMessage { get; set; }
+    [JsonPropertyName("@x")]
+    public string? Exception { get; set; }
 
     /// <summary>
-    /// The exception information, if any.
+    /// The event ID from Serilog event IDs (equivalent to Serilog's @i).
     /// </summary>
-    [JsonPropertyName("Exception")]
-    public string? Exception { get; set; }
+    [JsonPropertyName("@i")]
+    public string? EventId { get; set; }
+
+    /// <summary>
+    /// The W3C trace ID for distributed tracing (equivalent to Serilog's @tr).
+    /// </summary>
+    [JsonPropertyName("@tr")]
+    public string? TraceId { get; set; }
+
+    /// <summary>
+    /// The W3C span ID for distributed tracing (equivalent to Serilog's @sp).
+    /// </summary>
+    [JsonPropertyName("@sp")]
+    public string? SpanId { get; set; }
+
+    /// <summary>
+    /// The correlation ID for tracking requests across services (equivalent to Serilog's @l).
+    /// </summary>
+    [JsonPropertyName("@l")]
+    public string? CorrelationId { get; set; }
 
     /// <summary>
     /// The source context (class name) that emitted the log event.
@@ -75,34 +100,10 @@ public sealed class LogEvent
     public int? ThreadId { get; set; }
 
     /// <summary>
-    /// The W3C trace ID for distributed tracing.
-    /// </summary>
-    [JsonPropertyName("TraceId")]
-    public string? TraceId { get; set; }
-
-    /// <summary>
-    /// The W3C span ID for distributed tracing.
-    /// </summary>
-    [JsonPropertyName("SpanId")]
-    public string? SpanId { get; set; }
-
-    /// <summary>
-    /// The correlation ID for tracking requests across services.
-    /// </summary>
-    [JsonPropertyName("CorrelationId")]
-    public string? CorrelationId { get; set; }
-
-    /// <summary>
     /// The request ID.
     /// </summary>
     [JsonPropertyName("RequestId")]
     public string? RequestId { get; set; }
-
-    /// <summary>
-    /// The event ID (from Serilog event IDs).
-    /// </summary>
-    [JsonPropertyName("EventId")]
-    public string? EventId { get; set; }
 
     /// <summary>
     /// The user ID associated with the log.
@@ -130,6 +131,7 @@ public sealed class LogEvent
 
     /// <summary>
     /// Custom properties attached to the log event.
+    /// Only contains properties not mapped to top-level fields.
     /// </summary>
     [JsonPropertyName("Properties")]
     public Dictionary<string, object?>? Properties { get; set; }
@@ -141,9 +143,10 @@ public sealed class LogEvent
     {
         Timestamp = Timestamp,
         Level = Level,
+        Message = Message,
         MessageTemplate = MessageTemplate,
-        RenderedMessage = RenderedMessage,
         Exception = Exception,
+        EventId = EventId,
         SourceContext = SourceContext,
         Application = Application,
         Environment = Environment,
@@ -154,7 +157,6 @@ public sealed class LogEvent
         SpanId = SpanId,
         CorrelationId = CorrelationId,
         RequestId = RequestId,
-        EventId = EventId,
         UserId = UserId,
         SessionId = SessionId,
         Host = Host,

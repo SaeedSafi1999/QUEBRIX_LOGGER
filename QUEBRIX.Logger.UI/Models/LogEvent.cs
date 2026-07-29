@@ -4,7 +4,7 @@ namespace QUEBRIX.Logger.UI.Models;
 
 /// <summary>
 /// Represents a single log event as stored in Elasticsearch.
-/// Matches the Serilog/Elasticsearch schema.
+/// Matches the Serilog/Elasticsearch schema with @-prefixed field names.
 /// </summary>
 public class LogEvent
 {
@@ -25,9 +25,6 @@ public class LogEvent
 
     [JsonPropertyName("@i")]
     public string? EventId { get; set; }
-
-    [JsonPropertyName("@r")]
-    public string? Renderings { get; set; }
 
     [JsonPropertyName("@tr")]
     public string? TraceId { get; set; }
