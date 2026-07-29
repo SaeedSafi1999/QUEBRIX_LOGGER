@@ -13,7 +13,7 @@ namespace QUEBRIX.Logger.Server.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/ingest")]
-[Authorize(Policy = QuebrixPolicies.IngestionPolicy)]
+//[Authorize(Policy = QuebrixPolicies.IngestionPolicy)]
 [EnableRateLimiting("IngestionPolicy")]
 public sealed class IngestionController : ControllerBase
 {

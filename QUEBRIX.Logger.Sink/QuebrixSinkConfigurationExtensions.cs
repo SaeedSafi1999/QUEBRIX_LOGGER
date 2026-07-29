@@ -1,10 +1,7 @@
+using QUEBRIX.Logger.Common.Options;
 using Serilog;
 using Serilog.Configuration;
 using Serilog.Events;
-using QUEBRIX.Logger.Common;
-using QUEBRIX.Logger.Common.Options;
-using QUEBRIX.Logger.Core.Ingestion;
-using QUEBRIX.Logger.Storage.Abstractions;
 
 namespace QUEBRIX.Logger.Sink;
 
@@ -21,22 +18,11 @@ public static class QuebrixSinkConfigurationExtensions
     /// <param name="sinkConfiguration">Serilog sink configuration.</param>
     /// <param name="configureOptions">Action to configure QUEBRIX sink options.</param>
     /// <param name="restrictedToMinimumLevel">Minimum log level for this sink.</param>
-    /// <param name="batchSize">Maximum number of events per batch.</param>
-    /// <param name="period">Period in seconds between batch flushes.</param>
-    /// <param name="queueSize">Maximum size of the internal event queue.</param>
-    /// <param name="timeout">HTTP request timeout in seconds.</param>
-    /// <param name="compression">Enable GZip compression.</param>
     /// <returns>Logger configuration for chaining.</returns>
     public static LoggerConfiguration QUEBRIX(
         this LoggerSinkConfiguration sinkConfiguration,
         Action<QuebrixSinkOptions> configureOptions,
-        LogEventLevel restrictedToMinimumLevel = LogEventLevel.Verbose,
-        ILogStorage logStorage = null,
-        int? batchSize = null,
-        int? period = null,
-        int? queueSize = null,
-        int? timeout = null,
-        bool? compression = null)
+        LogEventLevel restrictedToMinimumLevel = LogEventLevel.Verbose)
     {
         if (sinkConfiguration == null)
             throw new ArgumentNullException(nameof(sinkConfiguration));
@@ -47,13 +33,10 @@ public static class QuebrixSinkConfigurationExtensions
         var options = new QuebrixSinkOptions();
         configureOptions(options);
 
-        // Override with explicit parameters if provided
-        if (batchSize.HasValue) options.BatchSize = batchSize.Value;
-        if (period.HasValue) options.FlushPeriodSeconds = period.Value;
-        if (queueSize.HasValue) options.QueueSize = queueSize.Value;
-        if (timeout.HasValue) options.TimeoutSeconds = timeout.Value;
-        if (compression.HasValue) options.UseCompression = compression.Value;
-        var sink = new QuebrixSink(options,logStorage);
+        if (string.IsNullOrEmpty(options.Url.ToString()))
+            throw new ArgumentException("Server URL is not set in options");
+
+        var sink = new QuebrixSink(options);
 
         return sinkConfiguration.Sink(sink, restrictedToMinimumLevel);
     }
